@@ -11,17 +11,20 @@ using System.Xml;
 
 namespace HttpClientToFiddlerLogger
 {
-    public class FiddlerLogger : DelegatingHandler
+    public class FiddlerLogger : DelegatingHandler, IDisposable
     {
-        public string Filename { get; }
+        private string Filename { get; }
         private readonly HttpClientHandler _innerHandler;
         private readonly ZipArchive _archive;
-        private FiddlerIndexHtml _fiddlerIndexHtml = new FiddlerIndexHtml();
+        private readonly FiddlerIndexHtml _fiddlerIndexHtml = new FiddlerIndexHtml();
         private int _index = 0;
-        public int Index => Interlocked.Increment(ref _index);
+        private int Index => Interlocked.Increment(ref _index);
 
+        
+        
         public FiddlerLogger(HttpClientHandler innerHandler, string filename) : base(innerHandler)
         {
+            innerHandler.AllowAutoRedirect = false;
             _innerHandler = innerHandler;
             if (!filename.EndsWith(".saz"))
             {
@@ -29,7 +32,33 @@ namespace HttpClientToFiddlerLogger
             }
             
             Filename = filename;
-            _archive = new ZipArchive(File.Open(Filename, FileMode.OpenOrCreate), ZipArchiveMode.Update);
+            _archive = new ZipArchive(File.Open(Filename, FileMode.Create), ZipArchiveMode.Update);
+        }
+
+        ~FiddlerLogger()
+        {
+            Dispose(false);
+        }
+
+        private bool disposed = false;
+        protected new void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
+            
+            if(disposing)
+            {
+                this.CloseArchive();
+                base.Dispose(disposing);
+            }
+
+            disposed = true;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -52,18 +81,29 @@ namespace HttpClientToFiddlerLogger
                 sb.AppendLine($"{item.Key}: {item.Value.ToString()}");
             }
 
-            sb.AppendLine();
             
             if (request.Content != null)
             {
-                sb.AppendLine(await request.Content.ReadAsStringAsync());
+                var content = CodePagesEncodingProvider.Instance.GetEncoding("windows-1252")
+                    .GetString(await request.Content.ReadAsByteArrayAsync());
+                foreach (var header in request.Content.Headers)
+                {
+                    sb.AppendLine($"{header.Key}: {string.Join(" ", header.Value)}");
+                }
+                
+                sb.Append(content);
+                sb.AppendLine();
+            }
+            else
+            {
+                sb.AppendLine();
             }
 
             var localIndex = Index;
 
-            var entry = _archive.CreateEntry($"raw/{localIndex.ToString("D8")}_c.txt").Open();
-                var byteArray = Encoding.Default.GetBytes(sb.ToString());
-                await entry.WriteAsync(byteArray, 0, byteArray.Length);
+            var entry = _archive.CreateEntry($"raw/{localIndex:D8}_c.txt").Open();
+                var byteArray = CodePagesEncodingProvider.Instance.GetEncoding("windows-1252").GetBytes(sb.ToString());
+                await entry.WriteAsync(byteArray, 0, byteArray.Length, cancellationToken);
             entry.Close();
             
             var response = await base.SendAsync(request, cancellationToken);
@@ -81,6 +121,7 @@ namespace HttpClientToFiddlerLogger
                     sb.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
             }
 
+            
             var logEntry = new LogEntry
             {
                 Host = response.RequestMessage.RequestUri.Host,
@@ -91,35 +132,46 @@ namespace HttpClientToFiddlerLogger
             };
             if (response.Content !=null)
             {
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsByteArrayAsync();
                 foreach (var item in response.Content.Headers)
                 {
                     sb.AppendLine($"{item.Key}: {string.Join(" ", item.Value)}");
                 }
+                
+                sb.AppendLine();
                 logEntry.Body = response.Content?.Headers.ContentLength;
                 logEntry.ContentType = response.Content?.Headers.ContentType.ToString();
-                logEntry.Caching = response.Headers.CacheControl.ToString()+"; "+response.Content?.Headers.Expires;
+                logEntry.Caching = response.Headers.CacheControl+"; "+response.Content?.Headers?.Expires;
                 
-                sb.AppendLine("Content-Length: "+response.Content.Headers.ContentLength);
-                sb.AppendLine();
-                sb.AppendLine(content);
+                if (content != null && content.Length>0)
+                {
+                    sb.Append(CodePagesEncodingProvider.Instance.GetEncoding("windows-1252").GetString(content));
+                }
             }
 
             entry = _archive.CreateEntry($"raw/{localIndex.ToString("D8")}_s.txt").Open();
-            byteArray = Encoding.Default.GetBytes(sb.ToString());
+            byteArray = CodePagesEncodingProvider.Instance.GetEncoding("windows-1252").GetBytes(sb.ToString());
+            //byteArray =  Encoding.GetEncoding(1251).GetBytes(sb.ToString());
             await entry.WriteAsync(byteArray, 0, byteArray.Length);
             entry.Close();
             
             _fiddlerIndexHtml.Entries.Add(logEntry);
-            
+            if (response.Headers.Location !=null)
+            {
+                Uri redirectLink = response.Headers.Location.IsAbsoluteUri
+                    ? response.Headers.Location
+                    : new Uri(new UriBuilder(request.RequestUri.Scheme, request.RequestUri.Host).Uri,  response.Headers.Location.ToString());
+                return await this.SendAsync(new HttpRequestMessage(HttpMethod.Get, redirectLink), cancellationToken);
+            }
             return response;
         }
 
-        public void Close()
+        private void CloseArchive()
         {
             var indexFile = _archive.CreateEntry("Index.html").Open();
             {
-                var bytes = Encoding.Default.GetBytes( _fiddlerIndexHtml.ToString());
+                //Encoding.Convert(Encoding.Default, Encoding.ASCII, Encoding.Default.GetBytes())
+                var bytes = Encoding.ASCII.GetBytes( _fiddlerIndexHtml.ToString());
                 indexFile.Write(bytes, 0, bytes.Length);
             }
             indexFile.Close();

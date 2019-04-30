@@ -20,7 +20,7 @@ namespace Test
             
             //await client.GetStringAsync("https://www.instagram.com/");
             await client.GetStringAsync("https://www.instagram.com/");
-            logger.Close();
+            logger.Dispose();
             Console.ReadKey();
             Console.WriteLine("Hello World!");
         }
