@@ -10,19 +10,16 @@ namespace Test
     {
         static async Task Main(string[] args)
         {
-            HttpClientHandler handler = new HttpClientHandler(); 
-            handler.CookieContainer = new CookieContainer();
-            handler.UseCookies = true;
-            var logger = new FiddlerLogger(handler, "1.saz");
-            HttpClient client = new HttpClient(logger);
-            client.DefaultRequestHeaders.Add("User-Agent","Fuck you");
-            
-            
-            //await client.GetStringAsync("https://www.instagram.com/");
-            await client.GetStringAsync("https://www.instagram.com/");
-            logger.Dispose();
-            Console.ReadKey();
-            Console.WriteLine("Hello World!");
+            var clientHandler = new HttpClientHandler {Proxy = new WebProxy("localhost:8888")};
+            var cookie = new CookieContainer();
+            clientHandler.CookieContainer = cookie;
+            using (var logger = new FiddlerLogger(clientHandler, "test"))
+            {
+                var client = new HttpClient(logger);
+                var test = new RequestTests(client, cookie);
+                await test.TestAll();
+            }
+            Console.WriteLine("Test done!");
         }
     }
 }
