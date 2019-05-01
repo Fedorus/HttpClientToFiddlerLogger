@@ -38,10 +38,10 @@ namespace HttpClientToFiddlerLogger
 
             var entries = body.Split(new[] {"</tr>"}, StringSplitOptions.RemoveEmptyEntries);
 
+            var logEntry = new LogEntry();
             foreach (var entry in entries)
             {
                 var fields = entry.Replace("<td>", "").Split(new[] {"</td>"}, StringSplitOptions.None);
-                var logEntry = new LogEntry();
                 logEntry.Index = int.Parse(fields[1]);
                 logEntry.StatusCode = int.Parse(fields[2]);
                 logEntry.Protocol = fields[3];
@@ -57,7 +57,7 @@ namespace HttpClientToFiddlerLogger
                 logEntry.Custom = fields[11];
                 result.Entries.Add(logEntry);
             }
-            result.LastIndex = result.Entries[result.Entries.Count - 1].Index;
+            result.LastIndex = logEntry.Index;
             return result;
         }
     }
