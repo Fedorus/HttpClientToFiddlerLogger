@@ -6,12 +6,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO.Compression;
-using System.Security.Cryptography.X509Certificates;
-using System.Xml;
 
 namespace HttpClientToFiddlerLogger
 {
-    public class FiddlerLogger : DelegatingHandler, IDisposable
+    public class FiddlerLogger : DelegatingHandler
     {
         private string Filename { get; }
         private readonly HttpClientHandler _innerHandler;
@@ -30,9 +28,19 @@ namespace HttpClientToFiddlerLogger
             {
                 filename = filename + ".saz";
             }
-            
             Filename = filename;
-            _archive = new ZipArchive(File.Open(Filename, FileMode.Create), ZipArchiveMode.Update);
+            _archive = new ZipArchive(File.Open(Filename, FileMode.OpenOrCreate), ZipArchiveMode.Update);
+            if (File.Exists(Filename))
+            {
+                var entry = _archive.GetEntry("Index.html");
+                if (entry == null)
+                {
+                    return;
+                }
+                var s = new StreamReader( (entry.Open())).ReadToEnd();
+                _fiddlerIndexHtml = FiddlerIndexHtml.Parse(s);
+                _index = _fiddlerIndexHtml.LastIndex;
+            }
         }
 
         ~FiddlerLogger()
