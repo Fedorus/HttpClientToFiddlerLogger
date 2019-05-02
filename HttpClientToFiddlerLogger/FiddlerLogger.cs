@@ -37,6 +37,8 @@ namespace HttpClientToFiddlerLogger
                 var indexFileContent = new StreamReader((entry.Open())).ReadToEnd();
                 _fiddlerIndexHtml = FiddlerIndexHtml.Parse(indexFileContent);
                 _index = _fiddlerIndexHtml.LastIndex;
+                _archive.Dispose();
+                _archive = new ZipArchive(File.Open(Filename, FileMode.Open), ZipArchiveMode.Update);
             }
         }
 
