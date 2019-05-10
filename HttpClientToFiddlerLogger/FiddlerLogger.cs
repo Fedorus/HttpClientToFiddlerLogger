@@ -11,25 +11,28 @@ namespace HttpClientToFiddlerLogger
 {
     public class FiddlerLogger : DelegatingHandler
     {
-        private string Filename { get; }
+        private string _archivePath;
         private readonly HttpClientHandler _innerHandler;
-        private readonly ZipArchive _archive;
+        private ZipArchive _archive;
         private readonly FiddlerIndexHtml _fiddlerIndexHtml = new FiddlerIndexHtml();
         private int _index = 0;
         private int Index => Interlocked.Increment(ref _index);
-        private object _lock = new object();
+        private readonly object _lock = new object();
 
-        public FiddlerLogger(HttpClientHandler innerHandler, string filename) : base(innerHandler)
+        public FiddlerLogger(HttpClientHandler innerHandler) : this(innerHandler, Path.GetTempFileName())
+        {
+        }
+
+        public FiddlerLogger(HttpClientHandler innerHandler, string archivePath) : base(innerHandler)
         {
             innerHandler.AllowAutoRedirect = false;
             _innerHandler = innerHandler;
-            if (!filename.EndsWith(".saz"))
+            if (!archivePath.EndsWith(".saz"))
             {
-                filename += ".saz";
+                archivePath += ".saz";
             }
-            
-            Filename = filename;
-            _archive = new ZipArchive(File.Open(Filename, FileMode.OpenOrCreate), ZipArchiveMode.Update);
+            _archivePath = archivePath;
+            _archive = new ZipArchive(File.Open(_archivePath, FileMode.OpenOrCreate), ZipArchiveMode.Update);
 
             var entry = _archive.GetEntry("Index.html");
             if (entry != null)
@@ -38,7 +41,7 @@ namespace HttpClientToFiddlerLogger
                 _fiddlerIndexHtml = FiddlerIndexHtml.Parse(indexFileContent);
                 _index = _fiddlerIndexHtml.LastIndex;
                 _archive.Dispose();
-                _archive = new ZipArchive(File.Open(Filename, FileMode.Open), ZipArchiveMode.Update);
+                _archive = new ZipArchive(File.Open(_archivePath, FileMode.Open), ZipArchiveMode.Update);
             }
         }
 
@@ -88,6 +91,7 @@ namespace HttpClientToFiddlerLogger
                 sb.AppendLine($"{item.Key}: {item.Value.ToString()}");
             }
 
+            sb.AppendLine();
 
             if (request.Content != null)
             {
@@ -100,6 +104,7 @@ namespace HttpClientToFiddlerLogger
 
                 sb.Append(content);
             }
+
             sb.AppendLine();
             
             Stream entry;
@@ -164,8 +169,26 @@ namespace HttpClientToFiddlerLogger
             return logEntry;
         }
 
+        public void Save()
+        {
+            lock (_lock)
+            {
+                CloseArchive();
+                _archive = new ZipArchive(File.Open( _archivePath, FileMode.Open), ZipArchiveMode.Update);
+            }
+        }
+
+        public void Save(string path)
+        {
+            lock (_lock)
+            {
+                CloseArchive();
+                File.Copy(_archivePath, path, true);
+                _archive = new ZipArchive(File.Open( _archivePath, FileMode.Open), ZipArchiveMode.Update);
+            }
+        }
+
         #region Dispose region
-        
         private bool _disposed = false;
         protected new void Dispose()
         {
@@ -186,7 +209,6 @@ namespace HttpClientToFiddlerLogger
 
             _disposed = true;
         }
-
         /// <summary>
         /// Adds http page in archive for fiddler. Called only in 
         /// </summary>
