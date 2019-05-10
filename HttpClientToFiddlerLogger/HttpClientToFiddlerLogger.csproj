@@ -7,6 +7,10 @@
         <Authors>Fedorus</Authors>
         <Copyright>Fedorus</Copyright>
         <RepositoryUrl>https://github.com/Fedorus/HttpClientToFiddlerLogger</RepositoryUrl>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Version>1.2.0</Version>
+        <AssemblyVersion>1.2.0.0</AssemblyVersion>
+        <PackageLicenseUrl>https://github.com/Fedorus/HttpClientToFiddlerLogger/blob/master/LICENSE</PackageLicenseUrl>
     </PropertyGroup>
 
     <ItemGroup>
