@@ -24,6 +24,7 @@ namespace Test
             await TestImagesAsync();
             await TestErrorCodes();
             await TestRedirects();
+            await TestPost();
         }
 
         public async Task TestErrorCodes()
@@ -53,6 +54,11 @@ namespace Test
             const string otherCookieName = "httpClientTest";
             const string otherCookieValue = "testValue";
             await _client.GetAsync($"cookies/set/{otherCookieName}/{otherCookieValue}");
+        }
+
+        public async Task TestPost()
+        {
+            await _client.PostAsync("anything", new StringContent("{ \"status\":\"ok\" }"));
         }
 
         public async Task TestImagesAsync()
