@@ -91,18 +91,17 @@ namespace HttpClientToFiddlerLogger
                 sb.AppendLine($"{item.Key}: {item.Value.ToString()}");
             }
 
-            sb.AppendLine();
-
             if (request.Content != null)
             {
                 var content = CodePagesEncodingProvider.Instance.GetEncoding("windows-1252")
                     .GetString(await request.Content.ReadAsByteArrayAsync());
                 foreach (var header in request.Content.Headers)
                 {
-                    sb.AppendLine($"{header.Key}: {string.Join(" ", header.Value)}");
+                    sb.AppendLine($"{header.Key}: {string.Join(",", header.Value)}");
                 }
+                sb.AppendLine();
 
-                sb.Append(content);
+                sb.AppendLine(content);
             }
 
             sb.AppendLine();

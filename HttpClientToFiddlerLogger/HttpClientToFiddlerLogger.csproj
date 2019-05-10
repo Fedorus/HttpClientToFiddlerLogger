@@ -2,6 +2,11 @@
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
+        <PackageVersion>1.1.0</PackageVersion>
+        <Title>HttpClientToFiddlerLogger</Title>
+        <Authors>Fedorus</Authors>
+        <Copyright>Fedorus</Copyright>
+        <RepositoryUrl>https://github.com/Fedorus/HttpClientToFiddlerLogger</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
