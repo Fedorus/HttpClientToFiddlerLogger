@@ -21,5 +21,14 @@ namespace Test
             }
             Console.WriteLine("Test done!");
         }
+
+        static async Task ShortExample()
+        {
+            using (var logger = new FiddlerLogger(new HttpClientHandler(), "logfileName.saz"))
+            {
+                var client = new HttpClient(logger);
+                await client.GetAsync("example.com");
+            }
+        }
     }
 }
